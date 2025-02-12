@@ -10,19 +10,27 @@ set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
 
 # Compiler flags
+set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/script/fsp.ld)
 set(CPU_FLAGS "-mcpu=cortex-m85 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16")
 set(COMMON_FLAGS "-fdata-sections -ffunction-sections -fno-common ${CPU_FLAGS}")
 set(CMAKE_C_FLAGS "${COMMON_FLAGS}")
 set(CMAKE_CXX_FLAGS "${COMMON_FLAGS} -fno-exceptions -fno-rtti")
 set(CMAKE_ASM_FLAGS "${CPU_FLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections -specs=nano.specs ${CPU_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections -specs=nano.specs -specs=nosys.specs -T${LINKER_SCRIPT} ${CPU_FLAGS}")
+
+
 
 # Include FSP directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/inc/api
     ${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/inc/instances
-    ${CMAKE_CURRENT_SOURCE_DIR}/ra/arm/CMSIS_5/CMSIS/Core/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/src/rm_freertos_port
+    ${CMAKE_CURRENT_SOURCE_DIR}/ra_cfg/fsp_cfg/bsp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ra/tes/dave2d/inc/
+    ${CMAKE_CURRENT_SOURCE_DIR}/ra/arm/CMSIS_6/CMSIS/Core/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/ra/aws/FreeRTOS/FreeRTOS/Source/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/ra_cfg/aws
     ${CMAKE_CURRENT_SOURCE_DIR}/ra_cfg/fsp_cfg
     ${CMAKE_CURRENT_SOURCE_DIR}/ra_gen
 )
@@ -30,6 +38,8 @@ include_directories(
 # Add FSP source files
 file(GLOB FSP_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/src/*/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/src/bsp/mcu/all/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/src/bsp/cmsis/Device/RENESAS/Source/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ra_gen/*.c"
 )
 
