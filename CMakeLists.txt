@@ -1,8 +1,22 @@
 cmake_minimum_required(VERSION 3.15)
 project(ra8d1_blinky C CXX ASM)
 
-# FSP path from environment variable
-set(FSP_PATH $ENV{FSP_PATH})
+
+# Configure Slint
+set(SLINT_FEATURE_RENDERER_SOFTWARE ON)
+set(SLINT_FEATURE_FREESTANDING ON)
+set(DEFAULT_SLINT_EMBED_RESOURCES "embed-for-software-renderer" CACHE STRING "")
+set(Rust_CARGO_TARGET thumbv8m.main-none-eabihf)
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+set(BUILD_SHARED_LIBS OFF)
+include(FetchContent)
+FetchContent_Declare(
+    Slint
+    GIT_REPOSITORY https://github.com/slint-ui/slint.git
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(Slint)
+
 
 # Set compiler
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
@@ -51,9 +65,16 @@ add_executable(${PROJECT_NAME}.elf
     ${FSP_SOURCES}
 )
 
+target_link_libraries(${PROJECT_NAME}.elf PRIVATE Slint::Slint)
+
+slint_target_sources(${PROJECT_NAME}.elf
+    app-window.slint
+)
+
 # # Post-build commands to create binary and hex files
 # add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
 #     COMMAND arm-none-eabi-size ${PROJECT_NAME}.elf
 #     COMMAND arm-none-eabi-objcopy -O binary ${PROJECT_NAME}.elf ${PROJECT_NAME}.bin
 #     COMMAND arm-none-eabi-objcopy -O ihex ${PROJECT_NAME}.elf ${PROJECT_NAME}.hex
 # )
+
