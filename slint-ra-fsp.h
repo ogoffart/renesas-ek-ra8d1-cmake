@@ -6,7 +6,6 @@
 #include <slint-platform.h>
 #include <type_traits>
 
-#include "r_display_api.h"
 #include "r_glcdc.h"
 
 struct SlintPlatformConfiguration {
