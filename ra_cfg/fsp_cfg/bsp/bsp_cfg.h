@@ -11,7 +11,7 @@
 #define RA_NOT_DEFINED 0
 #ifndef BSP_CFG_RTOS
 #if (RA_NOT_DEFINED) != (3)
-#define BSP_CFG_RTOS (2)
+#define BSP_CFG_RTOS (0)
 #elif (RA_NOT_DEFINED) != (RA_NOT_DEFINED)
               #define BSP_CFG_RTOS (1)
              #else

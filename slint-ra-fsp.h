@@ -17,7 +17,6 @@ struct SlintPlatformConfiguration {
   size_t framebuffer_size;
   /// GLCDC configuration pointer
   const display_cfg_t *display_cfg;
-  display_ctrl_t *display_ctrl;
   slint::platform::SoftwareRenderer::RenderingRotation rotation =
       slint::platform::SoftwareRenderer::RenderingRotation::NoRotation;
 };
@@ -45,26 +44,24 @@ struct Ra8d1SlintPlatform : public slint::platform::Platform {
   slint::platform::SoftwareRenderer::RenderingRotation rotation;
   std::span<Pixel> buffer1;
   std::span<Pixel> buffer2;
-  display_ctrl_t *m_display_ctrl;
-  const display_cfg_t *m_display_cfg;
+  glcdc_instance_ctrl_t m_display_ctrl;
 
   Ra8d1SlintPlatform(
       slint::PhysicalSize size,
       slint::platform::SoftwareRenderer::RenderingRotation rotation,
       std::span<Pixel> buffer1, std::span<Pixel> buffer2,
-      const display_cfg_t *display_cfg, display_ctrl_t *display_ctrl)
-      : size(size), rotation(rotation), buffer1(buffer1), buffer2(buffer2),
-        m_display_cfg(display_cfg), m_display_ctrl(display_ctrl) {
+      const display_cfg_t *display_cfg)
+      : size(size), rotation(rotation), buffer1(buffer1), buffer2(buffer2) {
     // Initialize GLCDC
-    R_GLCDC_Open(m_display_ctrl, m_display_cfg);
-    R_GLCDC_Start(m_display_ctrl);
+    R_GLCDC_Open(&m_display_ctrl, display_cfg);
+    R_GLCDC_Start(&m_display_ctrl);
   }
 
   ~Ra8d1SlintPlatform() {
-    while (FSP_SUCCESS != R_GLCDC_Stop(m_display_ctrl)) {
+    while (FSP_SUCCESS != R_GLCDC_Stop(&m_display_ctrl)) {
       // Wait for GLCDC register update to complete before closing driver.
     }
-    R_GLCDC_Close(m_display_ctrl);
+    R_GLCDC_Close(&m_display_ctrl);
   }
 
   std::unique_ptr<slint::platform::WindowAdapter>
@@ -76,8 +73,10 @@ struct Ra8d1SlintPlatform : public slint::platform::Platform {
   }
 
   std::chrono::milliseconds duration_since_start() override {
-    // You'll need to implement this based on your system's tick count
-    return std::chrono::milliseconds(0); // Replace with actual implementation
+    // FIXME: implement correctly
+    static int ms = 0;
+    ms++;
+    return std::chrono::milliseconds(ms);
   }
 
   void run_event_loop() override {
@@ -126,6 +125,5 @@ inline void slint_ra8d1_init(const SlintPlatformConfiguration &config) {
 
   slint::platform::set_platform(
       std::make_unique<slint::private_api::Ra8d1SlintPlatform>(
-          config.size, config.rotation, buffer1, buffer2, config.display_cfg,
-          config.display_ctrl));
+          config.size, config.rotation, buffer1, buffer2, config.display_cfg));
 }

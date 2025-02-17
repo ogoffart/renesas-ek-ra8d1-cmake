@@ -4,8 +4,30 @@
 #include "hal_data.h"
 #include "slint-ra-fsp.h"
 #include "slint.h"
+#include "timer_thread.h"
 
-void R_BSP_WarmStart(bsp_warm_start_event_t event);
+static fsp_err_t gpt_timer_PWM_setup(void) {
+  fsp_err_t err = FSP_SUCCESS;
+  /* Open GPT */
+  err = R_GPT_Open(&g_timer_PWM_ctrl, &g_timer_PWM_cfg);
+  if (FSP_SUCCESS != err) {
+    return err;
+  }
+  /* Enable GPT Timer */
+  err = R_GPT_Enable(&g_timer_PWM_ctrl);
+  /* Handle error */
+  if (FSP_SUCCESS != err) {
+    return err;
+  }
+  /* Start GPT timer */
+  err = R_GPT_Start(&g_timer_PWM_ctrl);
+  ;
+  if (FSP_SUCCESS != err) {
+    return err;
+  }
+
+  return FSP_SUCCESS;
+}
 
 extern bsp_leds_t g_bsp_leds;
 
@@ -44,9 +66,13 @@ int main ()
         }
     }
 
+    gpt_timer_PWM_setup();
+
     R_BSP_PinAccessEnable();
     R_BSP_PinWrite((bsp_io_port_pin_t)leds.p_leds[0], BSP_IO_LEVEL_HIGH);
     R_BSP_PinAccessDisable();
+
+    bsp_sdram_init();
 
     // Setup configuration
     SlintPlatformConfiguration config;
@@ -55,7 +81,6 @@ int main ()
     config.framebuffer = fb_background;
     config.framebuffer_size = sizeof(fb_background);
     config.display_cfg = &g_display0_cfg;
-    config.display_ctrl = &g_display0_ctrl;
     slint_ra8d1_init(config);
 
     R_BSP_PinAccessEnable();
@@ -69,6 +94,7 @@ int main ()
     R_BSP_PinAccessDisable();
 
     ui->show();
+    slint::run_event_loop();
 
     /* Holds level to set for pins */
     bsp_io_level_t pin_level = BSP_IO_LEVEL_LOW;
@@ -102,8 +128,6 @@ int main ()
         /* Delay */
         R_BSP_SoftwareDelay(delay, bsp_delay_units);
     }
-
-    slint::run_event_loop();
 }
 
 /*******************************************************************************************************************//**
@@ -112,8 +136,7 @@ int main ()
  *
  * @param[in]  event    Where at in the start up process the code is currently at
  **********************************************************************************************************************/
-void R_BSP_WarmStart (bsp_warm_start_event_t event)
-{
+extern "C" void R_BSP_WarmStart(bsp_warm_start_event_t event) {
     if (BSP_WARM_START_RESET == event)
     {
 #if BSP_FEATURE_FLASH_LP_VERSION != 0
@@ -135,7 +158,7 @@ void R_BSP_WarmStart (bsp_warm_start_event_t event)
     }
 }
 
-void _DisplayVsyncCallback(display_callback_args_t *p_args) {
+extern "C" void _DisplayVsyncCallback(display_callback_args_t *p_args) {
     FSP_PARAMETER_NOT_USED(p_args);
 #if EMWIN_LCD_VSYNC_WAIT
 #if EMWIN_CFG_RTOS == 2 // FreeRTOS
@@ -356,7 +379,7 @@ static const lcd_table_setting_t g_lcd_init_focuslcd[] =
 };
 // clang-format on
 
-void mipi_dsi0_callback(mipi_dsi_callback_args_t *p_args) {
+extern "C" void mipi_dsi0_callback(mipi_dsi_callback_args_t *p_args) {
     switch (p_args->event) {
     case MIPI_DSI_EVENT_POST_OPEN: {
         /* Initialize sequence for LCD. MIPI operation is in Command Mode */
