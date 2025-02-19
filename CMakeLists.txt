@@ -55,7 +55,7 @@ file(GLOB FSP_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/src/bsp/mcu/all/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ra/fsp/src/bsp/cmsis/Device/RENESAS/Source/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ra_gen/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ra/aws/FreeRTOS/FreeRTOS/Source/*.c"
+    #"${CMAKE_CURRENT_SOURCE_DIR}/ra/aws/FreeRTOS/FreeRTOS/Source/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/ra/board/ra8d1_ek/board_leds.c"
 )
 

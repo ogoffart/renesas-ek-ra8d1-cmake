@@ -66,13 +66,48 @@ int main ()
         }
     }
 
+    /* Configure SysTick to interrupt at 1KHz. */
+    SysTick_Config(SystemCoreClock / 1000);
+
     gpt_timer_PWM_setup();
+    R_IOPORT_PinWrite(&g_ioport_ctrl, DISP_BLEN, BSP_IO_LEVEL_HIGH);
 
     R_BSP_PinAccessEnable();
     R_BSP_PinWrite((bsp_io_port_pin_t)leds.p_leds[0], BSP_IO_LEVEL_HIGH);
     R_BSP_PinAccessDisable();
 
     bsp_sdram_init();
+
+    glcdc_instance_ctrl_t &m_display_ctrl = g_display0_ctrl;
+    R_GLCDC_Open(&m_display_ctrl, &g_display0_cfg);
+    R_GLCDC_Start(&m_display_ctrl);
+    for (int i = 0;
+         i < DISPLAY_BUFFER_STRIDE_BYTES_INPUT0 * DISPLAY_VSIZE_INPUT0 / 2;
+         i++) {
+        fb_background[0][i] = 0xf0;
+    }
+    fsp_err_t err = R_GLCDC_BufferChange(
+        &m_display_ctrl, reinterpret_cast<uint8_t *>(fb_background[0]),
+        DISPLAY_FRAME_LAYER_1);
+
+    /* Holds level to set for pins */
+    bsp_io_level_t pin_level = BSP_IO_LEVEL_LOW;
+
+    for (int i = 0; i < 5; i++) {
+        R_BSP_PinAccessEnable();
+
+        for (uint32_t i = 0; i < leds.led_count; i++) {
+            uint32_t pin = leds.p_leds[i];
+            R_BSP_PinWrite((bsp_io_port_pin_t)pin, pin_level);
+        }
+        R_BSP_PinAccessDisable();
+        if (BSP_IO_LEVEL_LOW == pin_level) {
+            pin_level = BSP_IO_LEVEL_HIGH;
+        } else {
+            pin_level = BSP_IO_LEVEL_LOW;
+        }
+        R_BSP_SoftwareDelay(delay, bsp_delay_units);
+    }
 
     // Setup configuration
     SlintPlatformConfiguration config;
@@ -95,39 +130,6 @@ int main ()
 
     ui->show();
     slint::run_event_loop();
-
-    /* Holds level to set for pins */
-    bsp_io_level_t pin_level = BSP_IO_LEVEL_LOW;
-
-    for (int i = 0; i < 3; i++) {
-        /* Enable access to the PFS registers. If using r_ioport module then
-         * register protection is automatically handled. This code uses BSP
-         * IO functions to show how it is used.
-         */
-        R_BSP_PinAccessEnable();
-
-        /* Update all board LEDs */
-        for (uint32_t i = 0; i < leds.led_count; i++) {
-            /* Get pin to toggle */
-            uint32_t pin = leds.p_leds[i];
-
-            /* Write to this pin */
-            R_BSP_PinWrite((bsp_io_port_pin_t)pin, pin_level);
-        }
-
-        /* Protect PFS registers */
-        R_BSP_PinAccessDisable();
-
-        /* Toggle level for next write */
-        if (BSP_IO_LEVEL_LOW == pin_level) {
-            pin_level = BSP_IO_LEVEL_HIGH;
-        } else {
-            pin_level = BSP_IO_LEVEL_LOW;
-        }
-
-        /* Delay */
-        R_BSP_SoftwareDelay(delay, bsp_delay_units);
-    }
 }
 
 /*******************************************************************************************************************//**
@@ -221,6 +223,7 @@ void mipi_dsi_push_table(const lcd_table_setting_t *table) {
             // vTaskDelay(xDelay);
             R_BSP_SoftwareDelay(table->size, BSP_DELAY_UNITS_MILLISECONDS);
         } else {
+            mipi_semaphore_flag.store(false, std::memory_order_release);
             /* Send a command to the peripheral device */
             fsp_err = R_MIPI_DSI_Command(&g_mipi_dsi0_ctrl, &msg);
             APP_ERR_TRAP(fsp_err);
@@ -232,7 +235,6 @@ void mipi_dsi_push_table(const lcd_table_setting_t *table) {
             while (!mipi_semaphore_flag.load(std::memory_order_acquire)) {
               __asm("NOP");
             }
-            mipi_semaphore_flag.store(false, std::memory_order_release);
         }
         p_entry++;
     }
@@ -379,9 +381,33 @@ static const lcd_table_setting_t g_lcd_init_focuslcd[] =
 };
 // clang-format on
 
+static fsp_err_t dsi_layer_set_peripheral_max_return_msg_size() {
+    fsp_err_t err;
+    uint8_t msg_buffer[] = {0x02, 0x00};
+    mipi_dsi_cmd_t return_size_msg = {
+        .channel = 0,
+        .cmd_id = MIPI_DSI_CMD_ID_SET_MAXIMUM_RETURN_PACKET_SIZE,
+        .flags = MIPI_DSI_CMD_FLAG_LOW_POWER,
+        .tx_len = 2,
+        .p_tx_buffer = msg_buffer,
+    };
+    /* Set Return packet size */
+    mipi_semaphore_flag.store(false, std::memory_order_release);
+    err = R_MIPI_DSI_Command(&g_mipi_dsi0_ctrl, &return_size_msg);
+    if (FSP_SUCCESS == err) {
+        while (!mipi_semaphore_flag.load(std::memory_order_acquire)) {
+            __asm("NOP");
+        }
+    }
+
+    return err;
+}
+
 extern "C" void mipi_dsi0_callback(mipi_dsi_callback_args_t *p_args) {
     switch (p_args->event) {
     case MIPI_DSI_EVENT_POST_OPEN: {
+        dsi_layer_set_peripheral_max_return_msg_size();
+
         /* Initialize sequence for LCD. MIPI operation is in Command Mode */
         mipi_dsi_push_table(g_lcd_init_focuslcd);
     } break;
@@ -402,4 +428,8 @@ extern "C" void mipi_dsi0_callback(mipi_dsi_callback_args_t *p_args) {
     }
     }
     return;
+}
+
+extern "C" void SysTick_Handler(void) {
+    slint::private_api::Ra8d1SlintPlatform::g_gui_time_ms++;
 }

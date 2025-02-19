@@ -72,11 +72,9 @@ struct Ra8d1SlintPlatform : public slint::platform::Platform {
     return w;
   }
 
+  static inline std::atomic<uint32_t> g_gui_time_ms = {};
   std::chrono::milliseconds duration_since_start() override {
-    // FIXME: implement correctly
-    static int ms = 0;
-    ms++;
-    return std::chrono::milliseconds(ms);
+    return std::chrono::milliseconds(g_gui_time_ms.load());
   }
 
   void run_event_loop() override {
